@@ -60,7 +60,7 @@ export default function PlayPage() {
           .eq('id', eventId)
           .single();
 
-        if (eventErr) throw eventErr;
+        if (eventErr || !eventData) throw eventErr || new Error('Event not found');
         setEvent(eventData);
 
         // Fetch holes ordered by created_at

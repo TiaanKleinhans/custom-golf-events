@@ -12,7 +12,6 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  TooltipProps,
 } from 'recharts';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -33,7 +32,7 @@ type MemberScoreData = {
 };
 
 // Custom Tooltip component that sorts players by score and labels top 3
-const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload || !label) return null;
 
   // Sort payload by value (descending - higher points are better)
@@ -109,7 +108,7 @@ export default function EventDetailPage() {
           .or('isArchived.is.null,isArchived.eq.false')
           .single();
 
-        if (eventErr) throw eventErr;
+        if (eventErr || !eventData) throw eventErr || new Error('Event not found');
         setEvent(eventData);
 
         // Fetch holes for this event (ordered by created_at)

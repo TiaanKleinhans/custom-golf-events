@@ -36,7 +36,7 @@ export default function EventResultsPage() {
           .or('isArchived.is.null,isArchived.eq.false')
           .single();
 
-        if (eventErr) throw eventErr;
+        if (eventErr || !eventData) throw eventErr || new Error('Event not found');
         setEvent(eventData);
 
         // Fetch all holes for this event

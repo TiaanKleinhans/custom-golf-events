@@ -75,7 +75,7 @@ export default function HoleEditorPage() {
         .eq('id', holeId)
         .single();
 
-      if (holeErr) {
+      if (holeErr || !holeData) {
         setError('Could not load hole.');
         setLoading(false);
         return;
@@ -249,7 +249,7 @@ export default function HoleEditorPage() {
     const { data: groupData, error: groupErr } = await supabase
       .from('group')
       .insert({ name: newGroupName, score: null })
-      .select()
+      .select('id, name, score, points')
       .single();
 
     if (groupErr) {

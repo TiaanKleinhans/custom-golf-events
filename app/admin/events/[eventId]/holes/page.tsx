@@ -33,7 +33,7 @@ export default function HolesManagementPage() {
         .eq('id', eventId)
         .single();
 
-      if (eventErr) {
+      if (eventErr || !eventData) {
         setError('Could not load event.');
         setLoading(false);
         return;
@@ -70,7 +70,7 @@ export default function HolesManagementPage() {
         par: null,
         holeDescription: null,
       })
-      .select()
+      .select('id, eventId, par, name, holeDescription, created_at')
       .single();
 
     if (err) {

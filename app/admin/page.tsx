@@ -67,7 +67,7 @@ export default function AdminPage() {
     const { data, error: err } = await supabase
       .from('event')
       .insert({ name: 'New Event', eventDate: new Date().toISOString().split('T')[0] })
-      .select()
+      .select('id, name, eventDate')
       .single();
 
     if (err) {
