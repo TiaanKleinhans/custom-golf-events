@@ -71,7 +71,7 @@ export default function HoleEditorPage() {
       // Fetch hole
       const { data: holeData, error: holeErr } = await supabase
         .from('holes')
-        .select('id, eventId, par, name, holeDescription')
+        .select('id, eventId, par, name, holeDescription, created_at')
         .eq('id', holeId)
         .single();
 
