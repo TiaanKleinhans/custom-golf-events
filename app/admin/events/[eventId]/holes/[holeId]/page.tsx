@@ -96,7 +96,7 @@ export default function HoleEditorPage() {
       if (assignedGroupIds.length > 0) {
         const { data } = await supabase
           .from('group')
-          .select('id, name, score')
+          .select('id, name, score, points')
           .in('id', assignedGroupIds)
           .or('isArchived.is.null,isArchived.eq.false');
         groupsData = data;
@@ -415,7 +415,7 @@ export default function HoleEditorPage() {
     if (assignedGroupIds.length > 0) {
       const { data } = await supabase
         .from('group')
-        .select('id, name, score')
+        .select('id, name, score, points')
         .in('id', assignedGroupIds)
         .or('isArchived.is.null,isArchived.eq.false');
       groupsData = data;
