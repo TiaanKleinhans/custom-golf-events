@@ -69,7 +69,7 @@ export default function EventResultsPage() {
         if (groupIds.length > 0) {
           const { data, error: groupsErr } = await supabase
             .from('group')
-            .select('id, name, points')
+            .select('id, name, score, points')
             .in('id', groupIds)
             .or('isArchived.is.null,isArchived.eq.false');
 
