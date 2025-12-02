@@ -114,7 +114,7 @@ export default function EventDetailPage() {
         // Fetch holes for this event (ordered by created_at)
         const { data: holesData, error: holesErr } = await supabase
           .from('holes')
-          .select('id, eventId, par, name, created_at')
+          .select('id, eventId, par, name, holeDescription, created_at')
           .eq('eventId', eventId)
           .or('isArchived.is.null,isArchived.eq.false')
           .order('created_at', { ascending: true });
