@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   supabase,
@@ -43,7 +43,6 @@ export default function PlayPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const isInitialLoad = useRef(true);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -160,7 +159,17 @@ export default function PlayPage() {
         return { ...group, members };
       });
 
-      setGroups(groupsWithMembers);
+      // Sort groups by points (from database) - descending order, nulls at end
+      const sortedGroups = [...groupsWithMembers].sort((a, b) => {
+        const pointsA = a.points ?? null;
+        const pointsB = b.points ?? null;
+        if (pointsA === null && pointsB === null) return 0;
+        if (pointsA === null) return 1;
+        if (pointsB === null) return -1;
+        return pointsB - pointsA;
+      });
+
+      setGroups(sortedGroups);
 
       // Initialize scores from group.score
       const scores: Record<string, number | null> = {};
@@ -168,11 +177,6 @@ export default function PlayPage() {
         scores[group.id] = group.score;
       });
       setGroupScores(scores);
-      isInitialLoad.current = true;
-      // Reset flag after a brief delay to allow auto-save to work on user input
-      setTimeout(() => {
-        isInitialLoad.current = false;
-      }, 500);
     } catch (err) {
       setError('Could not load hole data.');
       // eslint-disable-next-line no-console
@@ -186,24 +190,38 @@ export default function PlayPage() {
     }
   }, [currentHole]);
 
-  // Auto-save when scores change (with debounce)
+  // Real-time subscription for group updates
   useEffect(() => {
-    if (!currentHole || saving || isInitialLoad.current) return;
+    if (!currentHole) return;
 
-    // Check if there are any scores entered
-    const hasScores = Object.values(groupScores).some(
-      (score) => score !== null && score !== undefined
-    );
-    if (!hasScores) return;
+    // Get current group IDs for this hole
+    const currentGroupIds = groups.map((g) => g.id);
+    if (currentGroupIds.length === 0) return;
 
-    // Debounce auto-save - wait 1 second after last change
-    const timeoutId = setTimeout(() => {
-      void handleSaveScores();
-    }, 1000);
+    // Subscribe to changes in the group table
+    const channel = supabase
+      .channel(`group-updates-${currentHole.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'group',
+          filter: `id=in.(${currentGroupIds.join(',')})`,
+        },
+        () => {
+          // Reload hole data when any group changes
+          void loadHoleData(currentHole.id);
+        }
+      )
+      .subscribe();
 
-    return () => clearTimeout(timeoutId);
+    // Cleanup subscription on unmount or when hole changes
+    return () => {
+      void supabase.removeChannel(channel);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupScores, currentHole]);
+  }, [currentHole?.id, groups.map((g) => g.id).join(',')]);
 
   const handleScoreChange = (groupId: string, value: string) => {
     const numValue = value === '' ? null : Number(value);
@@ -318,31 +336,25 @@ export default function PlayPage() {
     setSaving(false);
   };
 
-  const handlePrevious = async () => {
+  const handlePrevious = () => {
     if (currentHoleIndex > 0) {
-      // Save current scores before navigating
-      await handleSaveScores();
       const newIndex = currentHoleIndex - 1;
       setCurrentHoleIndex(newIndex);
       setCurrentHole(holes[newIndex]);
     }
   };
 
-  const handleNext = async () => {
+  const handleNext = () => {
     if (currentHoleIndex < holes.length - 1) {
-      // Save current scores before navigating
-      await handleSaveScores();
       const newIndex = currentHoleIndex + 1;
       setCurrentHoleIndex(newIndex);
       setCurrentHole(holes[newIndex]);
     }
   };
 
-  const handleHoleSelect = async (holeIndex: string) => {
+  const handleHoleSelect = (holeIndex: string) => {
     const index = parseInt(holeIndex, 10);
     if (index !== currentHoleIndex && index >= 0 && index < holes.length) {
-      // Save current scores before navigating
-      await handleSaveScores();
       setCurrentHoleIndex(index);
       setCurrentHole(holes[index]);
     }
@@ -420,18 +432,7 @@ export default function PlayPage() {
                 <p className="text-sm text-slate-500">No teams assigned to this hole.</p>
               ) : (
                 <div className="space-y-3">
-                  {groups
-                    .sort((a, b) => {
-                      const pointsA = pointsMap[a.id] ?? null;
-                      const pointsB = pointsMap[b.id] ?? null;
-                      // Sort by points descending (highest first)
-                      // If points are null, put them at the end
-                      if (pointsA === null && pointsB === null) return 0;
-                      if (pointsA === null) return 1;
-                      if (pointsB === null) return -1;
-                      return pointsB - pointsA;
-                    })
-                    .map((group) => {
+                  {groups.map((group) => {
                       const score = groupScores[group.id] ?? null;
                       const points = pointsMap[group.id] ?? null;
                       return (

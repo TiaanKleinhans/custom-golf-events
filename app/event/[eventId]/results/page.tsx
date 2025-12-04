@@ -22,8 +22,7 @@ export default function EventResultsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = async () => {
       setLoading(true);
       setError(null);
 
@@ -143,9 +142,39 @@ export default function EventResultsPage() {
       }
 
       setLoading(false);
-    };
+    }
+  };
 
+  useEffect(() => {
     void fetchData();
+  }, [eventId]);
+
+  // Real-time subscription for group updates
+  useEffect(() => {
+    if (!eventId) return;
+
+    // We need to get group IDs from the current state
+    // For now, subscribe to all groups and refetch when changes occur
+    const channel = supabase
+      .channel(`group-updates-results-${eventId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'group',
+        },
+        () => {
+          // Refetch data when any group changes
+          void fetchData();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      void supabase.removeChannel(channel);
+    };
   }, [eventId]);
 
   const winner = memberPoints.length > 0 ? memberPoints[0] : null;

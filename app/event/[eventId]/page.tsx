@@ -94,8 +94,7 @@ export default function EventDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = async () => {
       setLoading(true);
       setError(null);
 
@@ -269,10 +268,44 @@ export default function EventDetailPage() {
       }
 
       setLoading(false);
-    };
+  };
 
+  useEffect(() => {
     void fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
+
+  // Real-time subscription for group updates
+  useEffect(() => {
+    if (!eventId || groups.length === 0) return;
+
+    const groupIds = groups.map((g) => g.id);
+    if (groupIds.length === 0) return;
+
+    // Subscribe to changes in the group table
+    const channel = supabase
+      .channel(`group-updates-event-${eventId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'group',
+          filter: `id=in.(${groupIds.join(',')})`,
+        },
+        () => {
+          // Refetch data when any group changes
+          void fetchData();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [eventId, groups.map((g) => g.id).join(',')]);
 
   // Fetch clubs for current hole when hole index changes
   useEffect(() => {
