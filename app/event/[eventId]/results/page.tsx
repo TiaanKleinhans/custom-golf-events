@@ -27,7 +27,6 @@ export default function EventResultsPage() {
       setError(null);
 
       try {
-        // Fetch event
         const { data: eventData, error: eventErr } = await supabase
           .from('event')
           .select('id, name, eventDate')
@@ -38,7 +37,6 @@ export default function EventResultsPage() {
         if (eventErr || !eventData) throw eventErr || new Error('Event not found');
         setEvent(eventData);
 
-        // Fetch all holes for this event
         const { data: holesData, error: holesErr } = await supabase
           .from('holes')
           .select('id')
@@ -54,7 +52,6 @@ export default function EventResultsPage() {
           return;
         }
 
-        // Fetch all hole-group relationships
         const { data: holeGroupsData, error: hgErr } = await supabase
           .from('hole_group')
           .select('holeId, groupId')
@@ -62,7 +59,6 @@ export default function EventResultsPage() {
 
         if (hgErr) throw hgErr;
 
-        // Fetch all groups with points
         const groupIds = [...new Set(holeGroupsData?.map((hg) => hg.groupId) || [])];
         let groupsData: Group[] = [];
         if (groupIds.length > 0) {
@@ -76,7 +72,6 @@ export default function EventResultsPage() {
           groupsData = data || [];
         }
 
-        // Fetch all group-member relationships
         const { data: groupMembersData, error: gmErr } = await supabase
           .from('group_member')
           .select('groupId, memberId')
@@ -84,7 +79,6 @@ export default function EventResultsPage() {
 
         if (gmErr) throw gmErr;
 
-        // Fetch all members
         const memberIds = [...new Set(groupMembersData?.map((gm) => gm.memberId) || [])];
         let membersData: Member[] = [];
         if (memberIds.length > 0) {
@@ -98,10 +92,8 @@ export default function EventResultsPage() {
           membersData = data || [];
         }
 
-        // Calculate total points per member
         const memberPointsMap = new Map<string, MemberWithTotalPoints>();
 
-        // Initialize member points
         membersData.forEach((member) => {
           memberPointsMap.set(member.id, {
             member,
@@ -110,7 +102,6 @@ export default function EventResultsPage() {
           });
         });
 
-        // Sum up points from all groups for each member
         groupsData.forEach((group) => {
           const points = group.points || 0;
           if (points > 0) {
@@ -129,7 +120,6 @@ export default function EventResultsPage() {
           }
         });
 
-        // Sort by total points (highest first)
         const sortedMemberPoints = Array.from(memberPointsMap.values()).sort(
           (a, b) => b.totalPoints - a.totalPoints
         );
@@ -137,7 +127,6 @@ export default function EventResultsPage() {
         setMemberPoints(sortedMemberPoints);
       } catch (err) {
         setError('Could not load results. Please refresh.');
-        // eslint-disable-next-line no-console
         console.error(err);
       }
 
@@ -149,29 +138,24 @@ export default function EventResultsPage() {
     void fetchData();
   }, [eventId]);
 
-  // Real-time subscription for group updates
   useEffect(() => {
     if (!eventId) return;
 
-    // We need to get group IDs from the current state
-    // For now, subscribe to all groups and refetch when changes occur
     const channel = supabase
       .channel(`group-updates-results-${eventId}`)
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to INSERT, UPDATE, DELETE
+          event: '*',
           schema: 'public',
           table: 'group',
         },
         () => {
-          // Refetch data when any group changes
           void fetchData();
         }
       )
       .subscribe();
 
-    // Cleanup subscription on unmount
     return () => {
       void supabase.removeChannel(channel);
     };
@@ -218,7 +202,6 @@ export default function EventResultsPage() {
 
         {!loading && !error && winner && (
           <div className="space-y-4">
-            {/* Winner Section */}
             <div className="rounded-lg border-2 border-yellow-400 bg-gradient-to-br from-yellow-50 to-amber-50 p-6 shadow-lg">
               <div className="flex items-center justify-center mb-4">
                 <Trophy className="h-12 w-12 text-yellow-500" />
@@ -249,7 +232,6 @@ export default function EventResultsPage() {
               )}
             </div>
 
-            {/* Full Leaderboard */}
             <div className="rounded-lg border bg-white/95 p-4">
               <h3 className="mb-3 text-sm font-semibold text-slate-900">Full Leaderboard</h3>
               <div className="space-y-2">

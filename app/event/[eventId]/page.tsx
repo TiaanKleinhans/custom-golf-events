@@ -31,11 +31,8 @@ type MemberScoreData = {
   scores: { hole: string; cumulativeScore: number }[];
 };
 
-// Custom Tooltip component that sorts players by score and labels top 3
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload || !label) return null;
-
-  // Sort payload by value (descending - higher points are better)
   const sortedPayload = [...payload].sort((a, b) => {
     const aValue = a.value as number;
     const bValue = b.value as number;
@@ -99,7 +96,6 @@ export default function EventDetailPage() {
       setError(null);
 
       try {
-        // Fetch event
         const { data: eventData, error: eventErr } = await supabase
           .from('event')
           .select('id, name, eventDate')
@@ -110,7 +106,6 @@ export default function EventDetailPage() {
         if (eventErr || !eventData) throw eventErr || new Error('Event not found');
         setEvent(eventData);
 
-        // Fetch holes for this event (ordered by created_at)
         const { data: holesData, error: holesErr } = await supabase
           .from('holes')
           .select('id, eventId, par, name, holeDescription, created_at')
@@ -126,7 +121,6 @@ export default function EventDetailPage() {
           return;
         }
 
-        // Fetch all hole-group relationships for these holes
         const holeIds = holesData.map((h) => h.id);
         const { data: holeGroupsDataResult, error: hgErr } = await supabase
           .from('hole_group')
@@ -137,7 +131,6 @@ export default function EventDetailPage() {
         const holeGroupsDataArray = holeGroupsDataResult || [];
         setHoleGroupsData(holeGroupsDataArray);
 
-        // Fetch all groups
         const groupIds = [...new Set(holeGroupsDataArray.map((hg) => hg.groupId) || [])];
         let groupsData: Group[] = [];
         if (groupIds.length > 0) {
@@ -151,7 +144,6 @@ export default function EventDetailPage() {
         }
         setGroups(groupsData);
 
-        // Fetch all group-member relationships
         const { data: groupMembersData, error: gmErr } = await supabase
           .from('group_member')
           .select('groupId, memberId')
@@ -159,7 +151,6 @@ export default function EventDetailPage() {
 
         if (gmErr) throw gmErr;
 
-        // Fetch all members first
         const memberIds = [...new Set(groupMembersData?.map((gm) => gm.memberId) || [])];
         let membersData: Member[] = [];
         if (memberIds.length > 0) {
@@ -184,10 +175,8 @@ export default function EventDetailPage() {
         });
         setGroupMembers(groupMembersMap);
 
-        // Calculate scores per member
         const memberScoresMap = new Map<string, MemberScoreData>();
 
-        // Initialize member scores
         membersData.forEach((member) => {
           memberScoresMap.set(member.id, {
             memberId: member.id,
@@ -196,9 +185,7 @@ export default function EventDetailPage() {
           });
         });
 
-        // For each hole (in order), calculate cumulative POINTS (not scores)
         holesData.forEach((hole, holeIndex) => {
-          // Get groups assigned to this hole
           const groupsForHole = holeGroupsDataArray
             .filter((hg) => hg.holeId === hole.id)
             .map((hg) => {
@@ -207,29 +194,23 @@ export default function EventDetailPage() {
             })
             .filter((g) => g !== null) as (Group & { holeGroupId: string })[];
 
-          // Track which members have been processed for this hole
           const processedMembers = new Set<string>();
 
-          // For each group, get its POINTS for this hole (using group.points, not group.score)
           groupsForHole.forEach((group) => {
             const groupPoints = group.points || 0;
 
-            // Get members in this group
             const membersInGroup = groupMembersData
               ?.filter((gm) => gm.groupId === group.id)
               .map((gm) => gm.memberId) || [];
 
-            // Update cumulative points for each member in this group
             membersInGroup.forEach((memberId) => {
               const memberData = memberScoresMap.get(memberId);
               if (memberData) {
-                // Get previous cumulative points
                 const previousPoints =
                   memberData.scores.length > 0
                     ? memberData.scores[memberData.scores.length - 1].cumulativeScore
                     : 0;
 
-                // Add this hole's points
                 const newCumulativePoints = previousPoints + groupPoints;
 
                 memberData.scores.push({
@@ -242,7 +223,6 @@ export default function EventDetailPage() {
             });
           });
 
-          // For members not in any group for this hole, carry forward their previous points
           membersData.forEach((member) => {
             if (!processedMembers.has(member.id)) {
               const memberData = memberScoresMap.get(member.id);
@@ -263,7 +243,6 @@ export default function EventDetailPage() {
         setMemberScores(Array.from(memberScoresMap.values()));
       } catch (err) {
         setError('Could not load event data. Please refresh.');
-        // eslint-disable-next-line no-console
         console.error(err);
       }
 
@@ -272,42 +251,35 @@ export default function EventDetailPage() {
 
   useEffect(() => {
     void fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
 
-  // Real-time subscription for group updates
   useEffect(() => {
     if (!eventId || groups.length === 0) return;
 
     const groupIds = groups.map((g) => g.id);
     if (groupIds.length === 0) return;
 
-    // Subscribe to changes in the group table
     const channel = supabase
       .channel(`group-updates-event-${eventId}`)
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to INSERT, UPDATE, DELETE
+          event: '*',
           schema: 'public',
           table: 'group',
           filter: `id=in.(${groupIds.join(',')})`,
         },
         () => {
-          // Refetch data when any group changes
           void fetchData();
         }
       )
       .subscribe();
 
-    // Cleanup subscription on unmount
     return () => {
       void supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId, groups.map((g) => g.id).join(',')]);
 
-  // Fetch clubs for current hole when hole index changes
   useEffect(() => {
     if (viewMode === 'holes' && holes.length > 0 && currentHoleIndex < holes.length) {
       const fetchClubsForHole = async () => {
@@ -330,7 +302,6 @@ export default function EventDetailPage() {
             .order('orderby', { ascending: true, nullsFirst: false });
 
           if (clubsErr) {
-            // eslint-disable-next-line no-console
             console.error('Error fetching clubs:', clubsErr);
           } else {
             clubsData = data || [];
@@ -343,14 +314,12 @@ export default function EventDetailPage() {
     }
   }, [viewMode, currentHoleIndex, holes]);
 
-  // Sort member scores by final cumulative score (highest first)
   const sortedMemberScores = [...memberScores].sort((a, b) => {
     const aFinal = a.scores.length > 0 ? a.scores[a.scores.length - 1].cumulativeScore : 0;
     const bFinal = b.scores.length > 0 ? b.scores[b.scores.length - 1].cumulativeScore : 0;
-    return bFinal - aFinal; // Descending order (highest first)
+    return bFinal - aFinal;
   });
 
-  // Prepare chart data
   const chartData = holes.map((hole, index) => {
     const dataPoint: Record<string, string | number> = {
       hole: hole.name || `Hole ${index + 1}`,
@@ -366,7 +335,6 @@ export default function EventDetailPage() {
     return dataPoint;
   });
 
-  // Generate colors for member lines
   const colors = [
     '#10b981', // emerald-500
     '#3b82f6', // blue-500
@@ -432,7 +400,6 @@ export default function EventDetailPage() {
 
         {!loading && !error && memberScores.length > 0 && (
           <div className="space-y-4">
-            {/* View Toggle */}
             <div className="flex gap-2 rounded-lg border bg-white/95 p-2">
               <Button
                 onClick={() => setViewMode('chart')}
@@ -506,14 +473,12 @@ export default function EventDetailPage() {
                   const currentHole = holes[currentHoleIndex];
                   if (!currentHole) return null;
 
-                  // Get groups for this hole
                   const holeGroupIds =
                     holeGroupsData
                       ?.filter((hg) => hg.holeId === currentHole.id)
                       .map((hg) => hg.groupId) || [];
                   const holeGroups = groups.filter((g) => holeGroupIds.includes(g.id));
 
-                  // Sort groups by points to find winner
                   const sortedGroups = [...holeGroups].sort((a, b) => {
                     const pointsA = a.points ?? null;
                     const pointsB = b.points ?? null;
@@ -617,7 +582,6 @@ export default function EventDetailPage() {
                         </div>
                       )}
 
-                      {/* Navigation Buttons */}
                       <div className="mt-4 flex gap-2">
                         <Button
                           onClick={() => setCurrentHoleIndex(Math.max(0, currentHoleIndex - 1))}
@@ -646,7 +610,6 @@ export default function EventDetailPage() {
           </div>
         )}
 
-        {/* Final Results Link */}
         {!loading && !error && holes.length > 0 && (
           <div className="mt-4">
             <Link href={`/event/${eventId}/results`}>

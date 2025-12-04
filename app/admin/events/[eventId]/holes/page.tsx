@@ -26,7 +26,6 @@ export default function HolesManagementPage() {
       setLoading(true);
       setError(null);
 
-      // Fetch event
       const { data: eventData, error: eventErr } = await supabase
         .from('event')
         .select('id, name, eventDate')
@@ -41,7 +40,6 @@ export default function HolesManagementPage() {
 
       setEvent(eventData);
 
-      // Fetch holes ordered by created_at
       const { data: holesData, error: holesErr } = await supabase
         .from('holes')
         .select('id, eventId, par, name, holeDescription, created_at')

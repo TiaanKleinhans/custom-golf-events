@@ -68,7 +68,6 @@ export default function HoleEditorPage() {
       setLoading(true);
       setError(null);
 
-      // Fetch hole
       const { data: holeData, error: holeErr } = await supabase
         .from('holes')
         .select('id, eventId, par, name, holeDescription, created_at')
@@ -83,7 +82,6 @@ export default function HoleEditorPage() {
 
       setHole(holeData);
 
-      // Fetch groups assigned to THIS hole only (groups are hole-specific)
       const { data: holeGroupsData } = await supabase
         .from('hole_group')
         .select('groupId')
@@ -91,7 +89,6 @@ export default function HoleEditorPage() {
 
       const assignedGroupIds = holeGroupsData?.map((hg) => hg.groupId) || [];
 
-      // Fetch only groups assigned to this hole
       let groupsData = null;
       if (assignedGroupIds.length > 0) {
         const { data } = await supabase
@@ -102,7 +99,6 @@ export default function HoleEditorPage() {
         groupsData = data;
       }
 
-      // Fetch group members
       const { data: groupMembersData } = await supabase
         .from('group_member')
         .select('groupId, memberId');
@@ -123,10 +119,8 @@ export default function HoleEditorPage() {
       });
 
       setAllGroups(groupsWithMembers);
-      // All groups shown are assigned to this hole
       setAssignedGroups(groupsData || []);
 
-      // Fetch all clubs
       const { data: clubsData, error: clubsErr } = await supabase
         .from('club')
         .select('id, name, orderby')
@@ -134,11 +128,9 @@ export default function HoleEditorPage() {
         .order('orderby', { ascending: true, nullsFirst: false });
 
       if (clubsErr) {
-        // eslint-disable-next-line no-console
         console.error('Error fetching clubs:', clubsErr);
       }
 
-      // Sort by sortorder, handling null values (nulls go last)
       const sortedClubs = (clubsData || []).sort((a, b) => {
         if (a.orderby === null && b.orderby === null) return 0;
         if (a.orderby === null) return 1;
@@ -148,7 +140,6 @@ export default function HoleEditorPage() {
 
       setAllClubs(sortedClubs);
 
-      // Fetch assigned clubs for this hole
       const { data: holeClubsData } = await supabase
         .from('hole_club')
         .select('clubId')
@@ -171,7 +162,6 @@ export default function HoleEditorPage() {
     setError(null);
 
     try {
-      // Update hole
       const { error: updateError } = await supabase
         .from('holes')
         .update({
@@ -183,7 +173,6 @@ export default function HoleEditorPage() {
 
       if (updateError) throw updateError;
 
-      // Update hole-group relationships
       await supabase.from('hole_group').delete().eq('holeId', holeId);
       if (assignedGroups.length > 0) {
         const { error: relError } = await supabase.from('hole_group').insert(
@@ -195,7 +184,6 @@ export default function HoleEditorPage() {
         if (relError) throw relError;
       }
 
-      // Update hole-club relationships
       await supabase.from('hole_club').delete().eq('holeId', holeId);
       if (assignedClubs.length > 0) {
         const { error: clubError } = await supabase.from('hole_club').insert(
@@ -209,7 +197,6 @@ export default function HoleEditorPage() {
 
       router.push(`/admin/events/${eventId}/holes`);
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error(err);
       setError('There was a problem saving the hole.');
     } finally {
@@ -217,13 +204,9 @@ export default function HoleEditorPage() {
     }
   };
 
-  // Groups are automatically assigned to the hole when created, so we don't need toggle
-  // This function is kept for compatibility but groups are always assigned to their hole
   const handleToggleGroup = (groupId: string) => {
-    // Remove group from this hole (archive the relationship)
     const isAssigned = assignedGroups.some((g) => g.id === groupId);
     if (isAssigned) {
-      // Remove from hole_group relationship
       supabase.from('hole_group').delete().eq('holeId', holeId).eq('groupId', groupId);
       setAssignedGroups(assignedGroups.filter((g) => g.id !== groupId));
       setAllGroups(allGroups.filter((g) => g.id !== groupId));
@@ -245,7 +228,6 @@ export default function HoleEditorPage() {
   const handleCreateGroup = async () => {
     if (!newGroupName.trim()) return;
 
-    // Create the group
     const { data: groupData, error: groupErr } = await supabase
       .from('group')
       .insert({ name: newGroupName, score: null })
@@ -257,19 +239,16 @@ export default function HoleEditorPage() {
       return;
     }
 
-    // Automatically assign this group to the current hole (groups are hole-specific)
     const { error: holeGroupErr } = await supabase
       .from('hole_group')
       .insert({ holeId: holeId, groupId: groupData.id });
 
     if (holeGroupErr) {
       setError('Could not assign group to hole.');
-      // Archive the group if assignment fails
       await supabase.from('group').update({ isArchived: true }).eq('id', groupData.id);
       return;
     }
 
-    // Add members to the group
     if (selectedMembersForNewGroup.length > 0) {
       const { error: memberErr } = await supabase.from('group_member').insert(
         selectedMembersForNewGroup.map((memberId) => ({
@@ -280,24 +259,20 @@ export default function HoleEditorPage() {
 
       if (memberErr) {
         setError('Could not add members to group.');
-        // Archive the group if member assignment fails
         await supabase.from('group').update({ isArchived: true }).eq('id', groupData.id);
         return;
       }
     }
 
-    // Refresh groups data (this will update the UI with the new group)
     await refreshGroupsData();
     setNewGroupName('');
     setSelectedMembersForNewGroup([]);
     setShowCreateGroup(false);
   };
 
-  // Get members that are already assigned to other groups in this hole
   const getUnavailableMembers = (): string[] => {
     const unavailableMemberIds: string[] = [];
 
-    // All groups in allGroups are for this hole, so check all of them
     allGroups.forEach((group) => {
       group.members.forEach((member) => {
         if (!unavailableMemberIds.includes(member.id)) {
@@ -309,12 +284,9 @@ export default function HoleEditorPage() {
     return unavailableMemberIds;
   };
 
-  // Get available members for selection (not in any other group for this hole)
-  // Exclude members from the currently editing group if editing
   const getAvailableMembers = (excludeGroupId?: string): Option[] => {
     const unavailableIds = getUnavailableMembers();
 
-    // If editing a group, remove its current members from unavailable list
     const filteredUnavailable = excludeGroupId
       ? unavailableIds.filter((id) => {
           const editingGroupMembers = editingGroup?.members.map((m) => m.id) || [];
@@ -339,10 +311,8 @@ export default function HoleEditorPage() {
   const handleArchiveGroup = async () => {
     if (!archivingGroupId) return;
 
-    // Remove from this hole (delete the hole_group relationship)
     await supabase.from('hole_group').delete().eq('holeId', holeId).eq('groupId', archivingGroupId);
 
-    // Archive the group (set isArchived to true)
     const { error: err } = await supabase
       .from('group')
       .update({ isArchived: true })
@@ -350,12 +320,10 @@ export default function HoleEditorPage() {
 
     if (err) {
       setError('Could not archive group.');
-      // eslint-disable-next-line no-console
       console.error(err);
       return;
     }
 
-    // Refresh groups data to reflect the archiving
     await refreshGroupsData();
     setArchivingGroupId(null);
   };
@@ -363,7 +331,6 @@ export default function HoleEditorPage() {
   const handleSaveGroupEdit = async () => {
     if (!editingGroup) return;
 
-    // Update group name if changed
     if (editingGroupName !== (editingGroup.name || '')) {
       const { error: nameErr } = await supabase
         .from('group')
@@ -376,11 +343,8 @@ export default function HoleEditorPage() {
       }
     }
 
-    // Update group members
-    // First, delete existing group-member relationships
     await supabase.from('group_member').delete().eq('groupId', editingGroup.id);
 
-    // Then insert new relationships
     if (selectedMembersForEdit.length > 0) {
       const { error: memberErr } = await supabase.from('group_member').insert(
         selectedMembersForEdit.map((memberId) => ({
@@ -395,7 +359,6 @@ export default function HoleEditorPage() {
       }
     }
 
-    // Refresh groups data
     await refreshGroupsData();
     setEditingGroup(null);
     setEditingGroupName('');
@@ -403,7 +366,6 @@ export default function HoleEditorPage() {
   };
 
   const refreshGroupsData = async () => {
-    // Fetch groups assigned to THIS hole only
     const { data: holeGroupsData } = await supabase
       .from('hole_group')
       .select('groupId')
@@ -433,7 +395,6 @@ export default function HoleEditorPage() {
     });
 
     setAllGroups(groupsWithMembers);
-    // All groups shown are assigned to this hole
     setAssignedGroups(groupsData || []);
   };
 
@@ -446,10 +407,8 @@ export default function HoleEditorPage() {
       return;
     }
 
-    // Remove from this hole (delete the hole_group relationship)
     await supabase.from('hole_group').delete().eq('holeId', holeId).eq('groupId', groupId);
 
-    // Archive the group (set isArchived to true)
     const { error: err } = await supabase
       .from('group')
       .update({ isArchived: true })
@@ -460,7 +419,6 @@ export default function HoleEditorPage() {
       return;
     }
 
-    // Refresh groups data
     await refreshGroupsData();
   };
 
@@ -518,7 +476,6 @@ export default function HoleEditorPage() {
         {error && <p className="mt-2 text-center text-sm font-medium text-rose-200">{error}</p>}
 
         <div className="space-y-6">
-          {/* Hole Details */}
           <div className="rounded-lg border bg-white/95 p-4">
             <h2 className="mb-3 text-sm font-semibold">Hole Details</h2>
             <div className="space-y-3">
@@ -538,7 +495,6 @@ export default function HoleEditorPage() {
             </div>
           </div>
 
-          {/* Groups Management Table */}
           <div className="rounded-lg border bg-white/95 p-4">
             <div className="mb-3 flex items-center justify-between">
               <div>
@@ -613,7 +569,6 @@ export default function HoleEditorPage() {
             )}
           </div>
 
-          {/* Allowed Clubs Table */}
           <div className="rounded-lg border bg-white/95 p-4">
             <h2 className="mb-3 text-sm font-semibold">Allowed Clubs for This Hole</h2>
             {allClubs.length === 0 ? (
@@ -647,7 +602,6 @@ export default function HoleEditorPage() {
         </div>
       </main>
 
-      {/* Create Group Dialog */}
       <Dialog
         open={showCreateGroup}
         onOpenChange={(open) => {
@@ -709,7 +663,6 @@ export default function HoleEditorPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Group Dialog */}
       <Dialog
         open={!!editingGroup}
         onOpenChange={(open) => {
@@ -769,7 +722,6 @@ export default function HoleEditorPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Archive Group Dialog */}
       <Dialog open={!!archivingGroupId} onOpenChange={(open) => !open && setArchivingGroupId(null)}>
         <DialogContent>
           <DialogHeader>

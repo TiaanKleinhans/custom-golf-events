@@ -37,7 +37,6 @@ export default function EventPage() {
         setEvents(data || []);
       } catch (err) {
         setError('Could not load events. Please refresh.');
-        // eslint-disable-next-line no-console
         console.error(err);
       }
 

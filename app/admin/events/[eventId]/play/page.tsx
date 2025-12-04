@@ -52,7 +52,6 @@ export default function PlayPage() {
       setError(null);
 
       try {
-        // Fetch event
         const { data: eventData, error: eventErr } = await supabase
           .from('event')
           .select('id, name, eventDate')
@@ -62,7 +61,6 @@ export default function PlayPage() {
         if (eventErr || !eventData) throw eventErr || new Error('Event not found');
         setEvent(eventData);
 
-        // Fetch holes ordered by created_at
         const { data: holesData, error: holesErr } = await supabase
           .from('holes')
           .select('id, eventId, par, name, holeDescription, created_at')
@@ -79,7 +77,6 @@ export default function PlayPage() {
         }
       } catch (err) {
         setError('Could not load event data.');
-        // eslint-disable-next-line no-console
         console.error(err);
       }
 
@@ -91,7 +88,6 @@ export default function PlayPage() {
 
   const loadHoleData = async (holeId: string) => {
     try {
-      // Fetch clubs assigned to this hole
       const { data: holeClubsData } = await supabase
         .from('hole_club')
         .select('clubId')
@@ -112,7 +108,6 @@ export default function PlayPage() {
       }
       setClubs(clubsData);
 
-      // Fetch groups assigned to this hole
       const { data: holeGroupsData } = await supabase
         .from('hole_group')
         .select('groupId')
@@ -131,13 +126,11 @@ export default function PlayPage() {
         groupsData = data || [];
       }
 
-      // Fetch group members
       const { data: groupMembersData } = await supabase
         .from('group_member')
         .select('groupId, memberId')
         .in('groupId', groupIds);
 
-      // Fetch members
       const memberIds = [...new Set(groupMembersData?.map((gm) => gm.memberId) || [])];
       let membersData: Member[] = [];
       if (memberIds.length > 0) {
@@ -151,7 +144,6 @@ export default function PlayPage() {
         membersData = data || [];
       }
 
-      // Combine groups with members
       const groupsWithMembers: GroupWithMembers[] = groupsData.map((group) => {
         const memberIdsForGroup =
           groupMembersData?.filter((gm) => gm.groupId === group.id).map((gm) => gm.memberId) || [];
@@ -159,7 +151,6 @@ export default function PlayPage() {
         return { ...group, members };
       });
 
-      // Sort groups by points (from database) - descending order, nulls at end
       const sortedGroups = [...groupsWithMembers].sort((a, b) => {
         const pointsA = a.points ?? null;
         const pointsB = b.points ?? null;
@@ -171,7 +162,6 @@ export default function PlayPage() {
 
       setGroups(sortedGroups);
 
-      // Initialize scores from group.score
       const scores: Record<string, number | null> = {};
       groupsData.forEach((group) => {
         scores[group.id] = group.score;
@@ -179,7 +169,6 @@ export default function PlayPage() {
       setGroupScores(scores);
     } catch (err) {
       setError('Could not load hole data.');
-      // eslint-disable-next-line no-console
       console.error(err);
     }
   };
@@ -190,49 +179,42 @@ export default function PlayPage() {
     }
   }, [currentHole]);
 
-  // Real-time subscription for group updates
   useEffect(() => {
     if (!currentHole) return;
 
-    // Get current group IDs for this hole
     const currentGroupIds = groups.map((g) => g.id);
     if (currentGroupIds.length === 0) return;
 
-    // Subscribe to changes in the group table
     const channel = supabase
       .channel(`group-updates-${currentHole.id}`)
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to INSERT, UPDATE, DELETE
+          event: '*',
           schema: 'public',
           table: 'group',
           filter: `id=in.(${currentGroupIds.join(',')})`,
         },
         () => {
-          // Reload hole data when any group changes
           void loadHoleData(currentHole.id);
         }
       )
       .subscribe();
 
-    // Cleanup subscription on unmount or when hole changes
     return () => {
       void supabase.removeChannel(channel);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentHole?.id, groups.map((g) => g.id).join(',')]);
 
   const handleScoreChange = (groupId: string, value: string) => {
     const numValue = value === '' ? null : Number(value);
     if (numValue !== null && (numValue < 1 || numValue > 20)) {
-      return; // Invalid score range
+      return;
     }
     setGroupScores({ ...groupScores, [groupId]: numValue });
   };
 
   const calculatePoints = () => {
-    // Get groups with scores
     const groupsWithScores = groups
       .map((group) => ({
         ...group,
@@ -244,14 +226,11 @@ export default function PlayPage() {
       return {};
     }
 
-    // Sort by score (ascending - lower is better in golf)
     groupsWithScores.sort((a, b) => a.score - b.score);
 
-    // Calculate points based on ties
     const pointsMap: Record<string, number> = {};
-    const pointValues = [4, 3, 2, 1]; // 1st, 2nd, 3rd, 4th place points
+    const pointValues = [4, 3, 2, 1];
 
-    // If all groups are tied for first, they all get 4 points
     if (groupsWithScores.length > 0) {
       const firstScore = groupsWithScores[0].score;
       const allTied = groupsWithScores.every((g) => g.score === firstScore);
@@ -270,26 +249,18 @@ export default function PlayPage() {
       const currentScore = groupsWithScores[i].score;
       const tiedGroups: (GroupWithMembers & { score: number })[] = [];
 
-      // Find all groups with the same score
       while (i < groupsWithScores.length && groupsWithScores[i].score === currentScore) {
         tiedGroups.push(groupsWithScores[i]);
         i++;
       }
 
-      // Calculate points for this position
-      // If tied for first (position 0), all get 4 points
-      // If tied for second (position 1), all get 3 points
-      // If tied for third (position 2), all get 2 points
-      // If tied for fourth or lower (position 3+), all get 1 point
       const pointsForPosition =
         currentPosition === 0 ? 4 : currentPosition === 1 ? 3 : currentPosition === 2 ? 2 : 1;
 
-      // Assign points to all tied groups
       tiedGroups.forEach((group) => {
         pointsMap[group.id] = pointsForPosition;
       });
 
-      // Move to next position (skip all tied positions)
       currentPosition += tiedGroups.length;
     }
 
@@ -305,18 +276,15 @@ export default function PlayPage() {
     try {
       const pointsMap = calculatePoints();
 
-      // Save scores and update group totals
-      // Update each group with score and points
       for (const group of groups) {
         const score = groupScores[group.id];
         const points = pointsMap[group.id] || null;
 
-        // Update group with score (golf score 1-10) and points (calculated points 1-4)
         const { error: groupErr } = await supabase
           .from('group')
           .update({
-            score: score ?? null, // Golf score for this hole
-            points: points ?? null, // Calculated points for this hole
+            score: score ?? null,
+            points: points ?? null,
           })
           .eq('id', group.id);
 
@@ -325,11 +293,9 @@ export default function PlayPage() {
         }
       }
 
-      // Refresh data
       await loadHoleData(currentHole.id);
     } catch (err) {
       setError('Could not save scores.');
-      // eslint-disable-next-line no-console
       console.error(err);
     }
 
@@ -408,7 +374,6 @@ export default function PlayPage() {
 
         {!loading && currentHole && (
           <div className="space-y-4">
-            {/* Available Clubs */}
             {clubs.length > 0 && (
               <div className="rounded-lg border bg-white/95 p-4">
                 <h2 className="mb-3 text-sm font-semibold">Available Clubs</h2>
@@ -425,7 +390,6 @@ export default function PlayPage() {
               </div>
             )}
 
-            {/* Teams and Scores */}
             <div className="rounded-lg border bg-white/95 p-4">
               <h2 className="mb-3 text-sm font-semibold">Teams & Scores</h2>
               {groups.length === 0 ? (
@@ -472,7 +436,6 @@ export default function PlayPage() {
               )}
             </div>
 
-            {/* Hole Navigation Dropdown */}
             <div className="mb-3">
               <Select value={currentHoleIndex.toString()} onValueChange={handleHoleSelect}>
                 <SelectTrigger className="w-full bg-white">
@@ -494,7 +457,6 @@ export default function PlayPage() {
               </Select>
             </div>
 
-            {/* Navigation Buttons */}
             <div className="flex gap-2">
               <Button
                 onClick={handlePrevious}

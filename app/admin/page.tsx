@@ -51,7 +51,6 @@ export default function AdminPage() {
 
       if (err) {
         setError('Could not load events. Please refresh.');
-        // eslint-disable-next-line no-console
         console.error(err);
       } else if (data) {
         setEvents(data);
@@ -89,7 +88,6 @@ export default function AdminPage() {
   const handleSaveEdit = async () => {
     if (!editingEvent) return;
 
-    // Only update if values have changed
     const updateData: { name?: string; eventDate?: string } = {};
     if (eventName !== (editingEvent.name || '')) {
       updateData.name = eventName;
@@ -98,7 +96,6 @@ export default function AdminPage() {
       updateData.eventDate = eventDate;
     }
 
-    // If nothing changed, just close the dialog
     if (Object.keys(updateData).length === 0) {
       setEditingEvent(null);
       setEventName('');
@@ -113,7 +110,6 @@ export default function AdminPage() {
 
     if (err) {
       setError('Could not update event.');
-      // eslint-disable-next-line no-console
       console.error(err);
       return;
     }
@@ -129,7 +125,6 @@ export default function AdminPage() {
   const handleDeleteEvent = async () => {
     if (!deleteEventId) return;
 
-    // Archive all related holes
     const { data: holesData } = await supabase
       .from('holes')
       .select('id')
@@ -139,11 +134,9 @@ export default function AdminPage() {
     if (holesData && holesData.length > 0) {
       const holeIds = holesData.map((h) => h.id);
       
-      // Archive holes
       await supabase.from('holes').update({ isArchived: true }).in('id', holeIds);
     }
 
-    // Archive the event
     const { error: err } = await supabase
       .from('event')
       .update({ isArchived: true })
@@ -151,7 +144,6 @@ export default function AdminPage() {
 
     if (err) {
       setError('Could not archive event.');
-      // eslint-disable-next-line no-console
       console.error(err);
       return;
     }
@@ -281,7 +273,6 @@ export default function AdminPage() {
         )}
       </main>
 
-      {/* Edit Dialog */}
       <Dialog open={!!editingEvent} onOpenChange={(open) => !open && setEditingEvent(null)}>
         <DialogContent>
           <DialogHeader>
@@ -311,7 +302,6 @@ export default function AdminPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
       <Dialog open={!!deleteEventId} onOpenChange={(open) => !open && setDeleteEventId(null)}>
         <DialogContent>
           <DialogHeader>

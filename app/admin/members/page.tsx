@@ -28,10 +28,8 @@ export default function MembersPage() {
 
       if (err) {
         setError('Could not load members. Please refresh.');
-        // eslint-disable-next-line no-console
         console.error(err);
       } else if (data) {
-        // Sort by handicap (low to high), with nulls at the end
         const sorted = [...data].sort((a, b) => {
           const aHcp = a.handiCap ?? Infinity;
           const bHcp = b.handiCap ?? Infinity;
@@ -81,7 +79,6 @@ export default function MembersPage() {
       .eq('id', memberId);
     if (err) {
       setError('Could not delete member.');
-      // eslint-disable-next-line no-console
       console.error(err);
     } else {
       setMembers((prev) => prev.filter((m) => m.id !== memberId));
@@ -101,11 +98,9 @@ export default function MembersPage() {
         };
 
         if (member.id.startsWith('temp-')) {
-          // Insert new member
           const { error: insertError } = await supabase.from('member').insert(memberRow);
           if (insertError) throw insertError;
         } else {
-          // Update existing member
           const { error: updateError } = await supabase
             .from('member')
             .update(memberRow)
@@ -114,13 +109,11 @@ export default function MembersPage() {
         }
       }
 
-      // Reload to get new IDs for temp members
       const { data } = await supabase
         .from('member')
         .select('id, name, handiCap')
         .or('isArchived.is.null,isArchived.eq.false');
       if (data) {
-        // Sort by handicap (low to high), with nulls at the end
         const sorted = [...data].sort((a, b) => {
           const aHcp = a.handiCap ?? Infinity;
           const bHcp = b.handiCap ?? Infinity;
@@ -129,7 +122,6 @@ export default function MembersPage() {
         setMembers(sorted);
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.error(err);
       setError('There was a problem saving changes.');
     } finally {
