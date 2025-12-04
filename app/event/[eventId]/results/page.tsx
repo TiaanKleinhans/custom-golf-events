@@ -131,7 +131,6 @@ export default function EventResultsPage() {
       }
 
       setLoading(false);
-    }
   };
 
   useEffect(() => {
