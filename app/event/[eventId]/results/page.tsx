@@ -41,7 +41,8 @@ export default function EventResultsPage() {
           .from('holes')
           .select('id')
           .eq('eventId', eventId)
-          .or('isArchived.is.null,isArchived.eq.false');
+          .or('isArchived.is.null,isArchived.eq.false')
+          .order('created_at', { ascending: true });
 
         if (holesErr) throw holesErr;
 
