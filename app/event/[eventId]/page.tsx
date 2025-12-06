@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { supabase, type Event, type Hole, type Group, type Member, type Club } from '../../../lib/supabaseClient';
+import {
+  supabase,
+  type Event,
+  type Hole,
+  type Group,
+  type Member,
+  type Club,
+} from '../../../lib/supabaseClient';
 import {
   LineChart,
   Line,
@@ -47,20 +54,15 @@ const CustomTooltip = ({ active, payload, label }: any) => {
           const value = entry.value as number;
           const color = entry.color || '#6b7280';
           let rankLabel = '';
-          
+
           if (index === 0) rankLabel = '1st';
           else if (index === 1) rankLabel = '2nd';
           else if (index === 2) rankLabel = '3rd';
-          
+
           return (
             <div key={entry.dataKey} className="flex items-center gap-2 text-sm">
-              <div
-                className="h-3 w-3 rounded-full"
-                style={{ backgroundColor: color }}
-              />
-              <span className="font-medium text-slate-700">
-                {entry.name}:
-              </span>
+              <div className="h-3 w-3 rounded-full" style={{ backgroundColor: color }} />
+              <span className="font-medium text-slate-700">{entry.name}:</span>
               <span className="font-semibold text-slate-900">{value}</span>
               {rankLabel && (
                 <span className="ml-auto rounded bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">
@@ -92,161 +94,159 @@ export default function EventDetailPage() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
-        const { data: eventData, error: eventErr } = await supabase
-          .from('event')
-          .select('id, name, eventDate')
-          .eq('id', eventId)
-          .or('isArchived.is.null,isArchived.eq.false')
-          .single();
+    try {
+      const { data: eventData, error: eventErr } = await supabase
+        .from('event')
+        .select('id, name, eventDate')
+        .eq('id', eventId)
+        .or('isArchived.is.null,isArchived.eq.false')
+        .single();
 
-        if (eventErr || !eventData) throw eventErr || new Error('Event not found');
-        setEvent(eventData);
+      if (eventErr || !eventData) throw eventErr || new Error('Event not found');
+      setEvent(eventData);
 
-        const { data: holesData, error: holesErr } = await supabase
-          .from('holes')
-          .select('id, eventId, par, name, holeDescription, created_at')
-          .eq('eventId', eventId)
-          .or('isArchived.is.null,isArchived.eq.false')
-          .order('created_at', { ascending: true });
+      const { data: holesData, error: holesErr } = await supabase
+        .from('holes')
+        .select('id, eventId, par, name, holeDescription, created_at')
+        .eq('eventId', eventId)
+        .or('isArchived.is.null,isArchived.eq.false')
+        .order('name', { ascending: true, nullsFirst: false });
 
-        if (holesErr) throw holesErr;
-        setHoles(holesData || []);
+      if (holesErr) throw holesErr;
+      setHoles(holesData || []);
 
-        if (!holesData || holesData.length === 0) {
-          setLoading(false);
-          return;
-        }
+      if (!holesData || holesData.length === 0) {
+        setLoading(false);
+        return;
+      }
 
-        const holeIds = holesData.map((h) => h.id);
-        const { data: holeGroupsDataResult, error: hgErr } = await supabase
-          .from('hole_group')
-          .select('holeId, groupId')
-          .in('holeId', holeIds);
+      const holeIds = holesData.map((h) => h.id);
+      const { data: holeGroupsDataResult, error: hgErr } = await supabase
+        .from('hole_group')
+        .select('holeId, groupId')
+        .in('holeId', holeIds);
 
-        if (hgErr) throw hgErr;
-        const holeGroupsDataArray = holeGroupsDataResult || [];
-        setHoleGroupsData(holeGroupsDataArray);
+      if (hgErr) throw hgErr;
+      const holeGroupsDataArray = holeGroupsDataResult || [];
+      setHoleGroupsData(holeGroupsDataArray);
 
-        const groupIds = [...new Set(holeGroupsDataArray.map((hg) => hg.groupId) || [])];
-        let groupsData: Group[] = [];
-        if (groupIds.length > 0) {
-          const { data, error: groupsErr } = await supabase
-            .from('group')
-            .select('id, name, score, points')
-            .in('id', groupIds)
-            .or('isArchived.is.null,isArchived.eq.false');
-          if (groupsErr) throw groupsErr;
-          groupsData = data || [];
-        }
-        setGroups(groupsData);
+      const groupIds = [...new Set(holeGroupsDataArray.map((hg) => hg.groupId) || [])];
+      let groupsData: Group[] = [];
+      if (groupIds.length > 0) {
+        const { data, error: groupsErr } = await supabase
+          .from('group')
+          .select('id, name, score, points')
+          .in('id', groupIds)
+          .or('isArchived.is.null,isArchived.eq.false');
+        if (groupsErr) throw groupsErr;
+        groupsData = data || [];
+      }
+      setGroups(groupsData);
 
-        const { data: groupMembersData, error: gmErr } = await supabase
-          .from('group_member')
-          .select('groupId, memberId')
-          .in('groupId', groupIds);
+      const { data: groupMembersData, error: gmErr } = await supabase
+        .from('group_member')
+        .select('groupId, memberId')
+        .in('groupId', groupIds);
 
-        if (gmErr) throw gmErr;
+      if (gmErr) throw gmErr;
 
-        const memberIds = [...new Set(groupMembersData?.map((gm) => gm.memberId) || [])];
-        let membersData: Member[] = [];
-        if (memberIds.length > 0) {
-          const { data, error: membersErr } = await supabase
-            .from('member')
-            .select('id, name, handiCap')
-            .in('id', memberIds)
-            .or('isArchived.is.null,isArchived.eq.false');
-          if (membersErr) throw membersErr;
-          membersData = data || [];
-        }
+      const memberIds = [...new Set(groupMembersData?.map((gm) => gm.memberId) || [])];
+      let membersData: Member[] = [];
+      if (memberIds.length > 0) {
+        const { data, error: membersErr } = await supabase
+          .from('member')
+          .select('id, name, handiCap')
+          .in('id', memberIds)
+          .or('isArchived.is.null,isArchived.eq.false');
+        if (membersErr) throw membersErr;
+        membersData = data || [];
+      }
 
-        // Map group members
-        const groupMembersMap: Record<string, Member[]> = {};
-        groupIds.forEach((groupId) => {
-          const memberIdsForGroup =
-            groupMembersData
-              ?.filter((gm) => gm.groupId === groupId)
-              .map((gm) => gm.memberId) || [];
-          const members = membersData.filter((m) => memberIdsForGroup.includes(m.id));
-          groupMembersMap[groupId] = members;
+      // Map group members
+      const groupMembersMap: Record<string, Member[]> = {};
+      groupIds.forEach((groupId) => {
+        const memberIdsForGroup =
+          groupMembersData?.filter((gm) => gm.groupId === groupId).map((gm) => gm.memberId) || [];
+        const members = membersData.filter((m) => memberIdsForGroup.includes(m.id));
+        groupMembersMap[groupId] = members;
+      });
+      setGroupMembers(groupMembersMap);
+
+      const memberScoresMap = new Map<string, MemberScoreData>();
+
+      membersData.forEach((member) => {
+        memberScoresMap.set(member.id, {
+          memberId: member.id,
+          memberName: member.name || 'Unknown',
+          scores: [],
         });
-        setGroupMembers(groupMembersMap);
+      });
 
-        const memberScoresMap = new Map<string, MemberScoreData>();
+      holesData.forEach((hole, holeIndex) => {
+        const groupsForHole = holeGroupsDataArray
+          .filter((hg) => hg.holeId === hole.id)
+          .map((hg) => {
+            const group = groupsData.find((g) => g.id === hg.groupId);
+            return group ? { ...group, holeGroupId: hg.groupId } : null;
+          })
+          .filter((g) => g !== null) as (Group & { holeGroupId: string })[];
 
-        membersData.forEach((member) => {
-          memberScoresMap.set(member.id, {
-            memberId: member.id,
-            memberName: member.name || 'Unknown',
-            scores: [],
-          });
-        });
+        const processedMembers = new Set<string>();
 
-        holesData.forEach((hole, holeIndex) => {
-          const groupsForHole = holeGroupsDataArray
-            .filter((hg) => hg.holeId === hole.id)
-            .map((hg) => {
-              const group = groupsData.find((g) => g.id === hg.groupId);
-              return group ? { ...group, holeGroupId: hg.groupId } : null;
-            })
-            .filter((g) => g !== null) as (Group & { holeGroupId: string })[];
+        groupsForHole.forEach((group) => {
+          const groupPoints = group.points || 0;
 
-          const processedMembers = new Set<string>();
+          const membersInGroup =
+            groupMembersData?.filter((gm) => gm.groupId === group.id).map((gm) => gm.memberId) ||
+            [];
 
-          groupsForHole.forEach((group) => {
-            const groupPoints = group.points || 0;
+          membersInGroup.forEach((memberId) => {
+            const memberData = memberScoresMap.get(memberId);
+            if (memberData) {
+              const previousPoints =
+                memberData.scores.length > 0
+                  ? memberData.scores[memberData.scores.length - 1].cumulativeScore
+                  : 0;
 
-            const membersInGroup = groupMembersData
-              ?.filter((gm) => gm.groupId === group.id)
-              .map((gm) => gm.memberId) || [];
+              const newCumulativePoints = previousPoints + groupPoints;
 
-            membersInGroup.forEach((memberId) => {
-              const memberData = memberScoresMap.get(memberId);
-              if (memberData) {
-                const previousPoints =
-                  memberData.scores.length > 0
-                    ? memberData.scores[memberData.scores.length - 1].cumulativeScore
-                    : 0;
+              memberData.scores.push({
+                hole: hole.name || `Hole ${holeIndex + 1}`,
+                cumulativeScore: newCumulativePoints,
+              });
 
-                const newCumulativePoints = previousPoints + groupPoints;
-
-                memberData.scores.push({
-                  hole: hole.name || `Hole ${holeIndex + 1}`,
-                  cumulativeScore: newCumulativePoints,
-                });
-
-                processedMembers.add(memberId);
-              }
-            });
-          });
-
-          membersData.forEach((member) => {
-            if (!processedMembers.has(member.id)) {
-              const memberData = memberScoresMap.get(member.id);
-              if (memberData) {
-                const previousPoints =
-                  memberData.scores.length > 0
-                    ? memberData.scores[memberData.scores.length - 1].cumulativeScore
-                    : 0;
-                memberData.scores.push({
-                  hole: hole.name || `Hole ${holeIndex + 1}`,
-                  cumulativeScore: previousPoints,
-                });
-              }
+              processedMembers.add(memberId);
             }
           });
         });
 
-        setMemberScores(Array.from(memberScoresMap.values()));
-      } catch (err) {
-        setError('Could not load event data. Please refresh.');
-        console.error(err);
-      }
+        membersData.forEach((member) => {
+          if (!processedMembers.has(member.id)) {
+            const memberData = memberScoresMap.get(member.id);
+            if (memberData) {
+              const previousPoints =
+                memberData.scores.length > 0
+                  ? memberData.scores[memberData.scores.length - 1].cumulativeScore
+                  : 0;
+              memberData.scores.push({
+                hole: hole.name || `Hole ${holeIndex + 1}`,
+                cumulativeScore: previousPoints,
+              });
+            }
+          }
+        });
+      });
 
-      setLoading(false);
+      setMemberScores(Array.from(memberScoresMap.values()));
+    } catch (err) {
+      setError('Could not load event data. Please refresh.');
+      console.error(err);
+    }
+
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -327,9 +327,7 @@ export default function EventDetailPage() {
 
     sortedMemberScores.forEach((memberScore) => {
       const scoreForHole = memberScore.scores[index];
-      dataPoint[memberScore.memberName] = scoreForHole
-        ? scoreForHole.cumulativeScore
-        : 0;
+      dataPoint[memberScore.memberName] = scoreForHole ? scoreForHole.cumulativeScore : 0;
     });
 
     return dataPoint;
@@ -367,9 +365,7 @@ export default function EventDetailPage() {
           <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-emerald-200">
             Event Details
           </p>
-          <h1 className="text-xl font-semibold text-white">
-            {event?.name || 'Loading...'}
-          </h1>
+          <h1 className="text-xl font-semibold text-white">{event?.name || 'Loading...'}</h1>
           {event?.eventDate && (
             <p className="mt-1 text-sm text-emerald-200">
               {new Date(event.eventDate).toLocaleDateString()}
@@ -382,9 +378,7 @@ export default function EventDetailPage() {
         {loading && (
           <p className="mt-8 text-center text-sm text-emerald-100">Loading event data...</p>
         )}
-        {error && (
-          <p className="mt-8 text-center text-sm font-medium text-rose-200">{error}</p>
-        )}
+        {error && <p className="mt-8 text-center text-sm font-medium text-rose-200">{error}</p>}
 
         {!loading && !error && holes.length === 0 && (
           <div className="mt-8 rounded-lg border bg-white/95 p-6 text-center">
@@ -423,48 +417,51 @@ export default function EventDetailPage() {
 
             {viewMode === 'chart' && (
               <div className="rounded-lg border bg-white/95 p-4">
-              <h2 className="mb-4 text-base font-semibold text-slate-900">
-                Points Progression by Member
-              </h2>
-              <div className="w-full overflow-x-auto -mx-2 px-2">
-                <ResponsiveContainer width="100%" height={450} minWidth={350}>
-                  <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 60 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                    <XAxis
-                      dataKey="hole"
-                      stroke="#6b7280"
-                      style={{ fontSize: '14px', fontWeight: '500' }}
-                      angle={-45}
-                      textAnchor="end"
-                      height={70}
-                      interval={0}
-                    />
-                    <YAxis 
-                      stroke="#6b7280" 
-                      style={{ fontSize: '14px', fontWeight: '500' }}
-                      width={40}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend
-                      wrapperStyle={{ fontSize: '13px', paddingTop: '20px', fontWeight: '500' }}
-                      iconType="line"
-                      iconSize={16}
-                    />
-                    {sortedMemberScores.map((memberScore, index) => (
-                      <Line
-                        key={memberScore.memberId}
-                        type="monotone"
-                        dataKey={memberScore.memberName}
-                        stroke={colors[index % colors.length]}
-                        strokeWidth={3}
-                        dot={{ r: 5, fill: colors[index % colors.length] }}
-                        activeDot={{ r: 8, strokeWidth: 2 }}
+                <h2 className="mb-4 text-base font-semibold text-slate-900">
+                  Points Progression by Member
+                </h2>
+                <div className="w-full overflow-x-auto -mx-2 px-2">
+                  <ResponsiveContainer width="100%" height={450} minWidth={350}>
+                    <LineChart
+                      data={chartData}
+                      margin={{ top: 10, right: 10, left: 0, bottom: 60 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                      <XAxis
+                        dataKey="hole"
+                        stroke="#6b7280"
+                        style={{ fontSize: '14px', fontWeight: '500' }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={70}
+                        interval={0}
                       />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
+                      <YAxis
+                        stroke="#6b7280"
+                        style={{ fontSize: '14px', fontWeight: '500' }}
+                        width={40}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Legend
+                        wrapperStyle={{ fontSize: '13px', paddingTop: '20px', fontWeight: '500' }}
+                        iconType="line"
+                        iconSize={16}
+                      />
+                      {sortedMemberScores.map((memberScore, index) => (
+                        <Line
+                          key={memberScore.memberId}
+                          type="monotone"
+                          dataKey={memberScore.memberName}
+                          stroke={colors[index % colors.length]}
+                          strokeWidth={3}
+                          dot={{ r: 5, fill: colors[index % colors.length] }}
+                          activeDot={{ r: 8, strokeWidth: 2 }}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
-            </div>
             )}
 
             {viewMode === 'holes' && holes.length > 0 && (
@@ -488,9 +485,13 @@ export default function EventDetailPage() {
                     return pointsB - pointsA;
                   });
 
-                  const winner = sortedGroups.length > 0 && sortedGroups[0].points !== null ? sortedGroups[0] : null;
-                  const isTie = sortedGroups.length > 1 && 
-                    sortedGroups[0].points !== null && 
+                  const winner =
+                    sortedGroups.length > 0 && sortedGroups[0].points !== null
+                      ? sortedGroups[0]
+                      : null;
+                  const isTie =
+                    sortedGroups.length > 1 &&
+                    sortedGroups[0].points !== null &&
                     sortedGroups[0].points === sortedGroups[1]?.points;
 
                   return (
@@ -507,7 +508,9 @@ export default function EventDetailPage() {
                         </p>
                         {currentHoleClubs.length > 0 && (
                           <div className="mt-3">
-                            <p className="text-xs font-medium text-slate-600 mb-2">Allowed Clubs:</p>
+                            <p className="text-xs font-medium text-slate-600 mb-2">
+                              Allowed Clubs:
+                            </p>
                             <div className="flex flex-wrap gap-2">
                               {currentHoleClubs.map((club) => (
                                 <span
@@ -539,9 +542,11 @@ export default function EventDetailPage() {
                               {sortedGroups.map((group, index) => {
                                 const members = groupMembers[group.id] || [];
                                 const isWinner = winner && group.id === winner.id && !isTie;
-                                const isTiedWinner = isTie && index < sortedGroups.length && 
+                                const isTiedWinner =
+                                  isTie &&
+                                  index < sortedGroups.length &&
                                   sortedGroups[index].points === sortedGroups[0].points;
-                                
+
                                 return (
                                   <TableRow
                                     key={group.id}
@@ -593,7 +598,9 @@ export default function EventDetailPage() {
                           Previous
                         </Button>
                         <Button
-                          onClick={() => setCurrentHoleIndex(Math.min(holes.length - 1, currentHoleIndex + 1))}
+                          onClick={() =>
+                            setCurrentHoleIndex(Math.min(holes.length - 1, currentHoleIndex + 1))
+                          }
                           disabled={currentHoleIndex === holes.length - 1}
                           variant="outline"
                           className="flex-1"
@@ -623,4 +630,3 @@ export default function EventDetailPage() {
     </div>
   );
 }
-

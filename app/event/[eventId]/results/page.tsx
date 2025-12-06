@@ -23,115 +23,114 @@ export default function EventResultsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchData = async () => {
-      setLoading(true);
-      setError(null);
+    setLoading(true);
+    setError(null);
 
-      try {
-        const { data: eventData, error: eventErr } = await supabase
-          .from('event')
-          .select('id, name, eventDate')
-          .eq('id', eventId)
-          .or('isArchived.is.null,isArchived.eq.false')
-          .single();
+    try {
+      const { data: eventData, error: eventErr } = await supabase
+        .from('event')
+        .select('id, name, eventDate')
+        .eq('id', eventId)
+        .or('isArchived.is.null,isArchived.eq.false')
+        .single();
 
-        if (eventErr || !eventData) throw eventErr || new Error('Event not found');
-        setEvent(eventData);
+      if (eventErr || !eventData) throw eventErr || new Error('Event not found');
+      setEvent(eventData);
 
-        const { data: holesData, error: holesErr } = await supabase
-          .from('holes')
-          .select('id')
-          .eq('eventId', eventId)
-          .or('isArchived.is.null,isArchived.eq.false')
-          .order('created_at', { ascending: true });
+      const { data: holesData, error: holesErr } = await supabase
+        .from('holes')
+        .select('id')
+        .eq('eventId', eventId)
+        .or('isArchived.is.null,isArchived.eq.false')
+        .order('name', { ascending: true, nullsFirst: false });
 
-        if (holesErr) throw holesErr;
+      if (holesErr) throw holesErr;
 
-        const holeIds = holesData?.map((h) => h.id) || [];
+      const holeIds = holesData?.map((h) => h.id) || [];
 
-        if (holeIds.length === 0) {
-          setLoading(false);
-          return;
-        }
-
-        const { data: holeGroupsData, error: hgErr } = await supabase
-          .from('hole_group')
-          .select('holeId, groupId')
-          .in('holeId', holeIds);
-
-        if (hgErr) throw hgErr;
-
-        const groupIds = [...new Set(holeGroupsData?.map((hg) => hg.groupId) || [])];
-        let groupsData: Group[] = [];
-        if (groupIds.length > 0) {
-          const { data, error: groupsErr } = await supabase
-            .from('group')
-            .select('id, name, score, points')
-            .in('id', groupIds)
-            .or('isArchived.is.null,isArchived.eq.false');
-
-          if (groupsErr) throw groupsErr;
-          groupsData = data || [];
-        }
-
-        const { data: groupMembersData, error: gmErr } = await supabase
-          .from('group_member')
-          .select('groupId, memberId')
-          .in('groupId', groupIds);
-
-        if (gmErr) throw gmErr;
-
-        const memberIds = [...new Set(groupMembersData?.map((gm) => gm.memberId) || [])];
-        let membersData: Member[] = [];
-        if (memberIds.length > 0) {
-          const { data, error: membersErr } = await supabase
-            .from('member')
-            .select('id, name, handiCap')
-            .in('id', memberIds)
-            .or('isArchived.is.null,isArchived.eq.false');
-
-          if (membersErr) throw membersErr;
-          membersData = data || [];
-        }
-
-        const memberPointsMap = new Map<string, MemberWithTotalPoints>();
-
-        membersData.forEach((member) => {
-          memberPointsMap.set(member.id, {
-            member,
-            totalPoints: 0,
-            groups: [],
-          });
-        });
-
-        groupsData.forEach((group) => {
-          const points = group.points || 0;
-          if (points > 0) {
-            const memberIdsInGroup =
-              groupMembersData
-                ?.filter((gm) => gm.groupId === group.id)
-                .map((gm) => gm.memberId) || [];
-
-            memberIdsInGroup.forEach((memberId) => {
-              const memberData = memberPointsMap.get(memberId);
-              if (memberData) {
-                memberData.totalPoints += points;
-                memberData.groups.push(group);
-              }
-            });
-          }
-        });
-
-        const sortedMemberPoints = Array.from(memberPointsMap.values()).sort(
-          (a, b) => b.totalPoints - a.totalPoints
-        );
-
-        setMemberPoints(sortedMemberPoints);
-      } catch (err) {
-        setError('Could not load results. Please refresh.');
-        console.error(err);
+      if (holeIds.length === 0) {
+        setLoading(false);
+        return;
       }
 
-      setLoading(false);
+      const { data: holeGroupsData, error: hgErr } = await supabase
+        .from('hole_group')
+        .select('holeId, groupId')
+        .in('holeId', holeIds);
+
+      if (hgErr) throw hgErr;
+
+      const groupIds = [...new Set(holeGroupsData?.map((hg) => hg.groupId) || [])];
+      let groupsData: Group[] = [];
+      if (groupIds.length > 0) {
+        const { data, error: groupsErr } = await supabase
+          .from('group')
+          .select('id, name, score, points')
+          .in('id', groupIds)
+          .or('isArchived.is.null,isArchived.eq.false');
+
+        if (groupsErr) throw groupsErr;
+        groupsData = data || [];
+      }
+
+      const { data: groupMembersData, error: gmErr } = await supabase
+        .from('group_member')
+        .select('groupId, memberId')
+        .in('groupId', groupIds);
+
+      if (gmErr) throw gmErr;
+
+      const memberIds = [...new Set(groupMembersData?.map((gm) => gm.memberId) || [])];
+      let membersData: Member[] = [];
+      if (memberIds.length > 0) {
+        const { data, error: membersErr } = await supabase
+          .from('member')
+          .select('id, name, handiCap')
+          .in('id', memberIds)
+          .or('isArchived.is.null,isArchived.eq.false');
+
+        if (membersErr) throw membersErr;
+        membersData = data || [];
+      }
+
+      const memberPointsMap = new Map<string, MemberWithTotalPoints>();
+
+      membersData.forEach((member) => {
+        memberPointsMap.set(member.id, {
+          member,
+          totalPoints: 0,
+          groups: [],
+        });
+      });
+
+      groupsData.forEach((group) => {
+        const points = group.points || 0;
+        if (points > 0) {
+          const memberIdsInGroup =
+            groupMembersData?.filter((gm) => gm.groupId === group.id).map((gm) => gm.memberId) ||
+            [];
+
+          memberIdsInGroup.forEach((memberId) => {
+            const memberData = memberPointsMap.get(memberId);
+            if (memberData) {
+              memberData.totalPoints += points;
+              memberData.groups.push(group);
+            }
+          });
+        }
+      });
+
+      const sortedMemberPoints = Array.from(memberPointsMap.values()).sort(
+        (a, b) => b.totalPoints - a.totalPoints
+      );
+
+      setMemberPoints(sortedMemberPoints);
+    } catch (err) {
+      setError('Could not load results. Please refresh.');
+      console.error(err);
+    }
+
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -162,7 +161,8 @@ export default function EventResultsPage() {
   }, [eventId]);
 
   const winner = memberPoints.length > 0 ? memberPoints[0] : null;
-  const isTie = memberPoints.length > 1 && memberPoints[0]?.totalPoints === memberPoints[1]?.totalPoints;
+  const isTie =
+    memberPoints.length > 1 && memberPoints[0]?.totalPoints === memberPoints[1]?.totalPoints;
 
   return (
     <div className="flex min-h-screen flex-col bg-emerald-900 px-3 pb-6 pt-10 text-foreground">
@@ -189,9 +189,7 @@ export default function EventResultsPage() {
       </header>
 
       <main className="flex-1 overflow-y-auto">
-        {loading && (
-          <p className="mt-8 text-center text-sm text-emerald-100">Loading results...</p>
-        )}
+        {loading && <p className="mt-8 text-center text-sm text-emerald-100">Loading results...</p>}
         {error && <p className="mt-8 text-center text-sm font-medium text-rose-200">{error}</p>}
 
         {!loading && !error && memberPoints.length === 0 && (
@@ -242,8 +240,8 @@ export default function EventResultsPage() {
                       index === 0 && !isTie
                         ? 'border-yellow-400 bg-yellow-50'
                         : index < 3
-                          ? 'border-emerald-200 bg-emerald-50'
-                          : 'border-slate-200 bg-slate-50'
+                        ? 'border-emerald-200 bg-emerald-50'
+                        : 'border-slate-200 bg-slate-50'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -253,10 +251,10 @@ export default function EventResultsPage() {
                             index === 0 && !isTie
                               ? 'bg-yellow-400 text-yellow-900'
                               : index === 1
-                                ? 'bg-slate-300 text-slate-700'
-                                : index === 2
-                                  ? 'bg-amber-300 text-amber-700'
-                                  : 'bg-slate-200 text-slate-600'
+                              ? 'bg-slate-300 text-slate-700'
+                              : index === 2
+                              ? 'bg-amber-300 text-amber-700'
+                              : 'bg-slate-200 text-slate-600'
                           }`}
                         >
                           {index + 1}
@@ -283,4 +281,3 @@ export default function EventResultsPage() {
     </div>
   );
 }
-

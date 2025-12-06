@@ -66,7 +66,7 @@ export default function PlayPage() {
           .select('id, eventId, par, name, holeDescription, created_at')
           .eq('eventId', eventId)
           .or('isArchived.is.null,isArchived.eq.false')
-          .order('created_at', { ascending: true });
+          .order('name', { ascending: true, nullsFirst: false });
 
         if (holesErr) throw holesErr;
         setHoles(holesData || []);
@@ -397,41 +397,41 @@ export default function PlayPage() {
               ) : (
                 <div className="space-y-3">
                   {groups.map((group) => {
-                      const score = groupScores[group.id] ?? null;
-                      const points = pointsMap[group.id] ?? null;
-                      return (
-                        <div
-                          key={group.id}
-                          className="rounded-lg border border-slate-200 bg-slate-50 p-3"
-                        >
-                          <div className="mb-2 flex items-center justify-between">
-                            <div>
-                              <p className="font-semibold text-slate-900">{group.name}</p>
-                              <p className="text-xs text-slate-500">
-                                {group.members.map((m) => m.name).join(', ')}
-                              </p>
-                            </div>
-                            {points !== null && (
-                              <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
-                                {points} pts
-                              </span>
-                            )}
+                    const score = groupScores[group.id] ?? null;
+                    const points = pointsMap[group.id] ?? null;
+                    return (
+                      <div
+                        key={group.id}
+                        className="rounded-lg border border-slate-200 bg-slate-50 p-3"
+                      >
+                        <div className="mb-2 flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-slate-900">{group.name}</p>
+                            <p className="text-xs text-slate-500">
+                              {group.members.map((m) => m.name).join(', ')}
+                            </p>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <label className="text-xs font-medium text-slate-600">Score:</label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="10"
-                              value={score ?? ''}
-                              onChange={(e) => handleScoreChange(group.id, e.target.value)}
-                              placeholder="score"
-                              className="w-20"
-                            />
-                          </div>
+                          {points !== null && (
+                            <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
+                              {points} pts
+                            </span>
+                          )}
                         </div>
-                      );
-                    })}
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-medium text-slate-600">Score:</label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max="10"
+                            value={score ?? ''}
+                            onChange={(e) => handleScoreChange(group.id, e.target.value)}
+                            placeholder="score"
+                            className="w-20"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

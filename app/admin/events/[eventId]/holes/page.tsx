@@ -45,7 +45,7 @@ export default function HolesManagementPage() {
         .select('id, eventId, par, name, holeDescription, created_at')
         .eq('eventId', eventId)
         .or('isArchived.is.null,isArchived.eq.false')
-        .order('created_at', { ascending: true });
+        .order('name', { ascending: true, nullsFirst: false });
 
       if (holesErr) {
         setError('Could not load holes.');
@@ -82,7 +82,12 @@ export default function HolesManagementPage() {
   };
 
   const handleDeleteHole = async (holeId: string) => {
-    if (!confirm('Are you sure you want to archive this hole? It will be hidden but can be restored later.')) return;
+    if (
+      !confirm(
+        'Are you sure you want to archive this hole? It will be hidden but can be restored later.'
+      )
+    )
+      return;
 
     const { error: err } = await supabase
       .from('holes')
@@ -120,9 +125,7 @@ export default function HolesManagementPage() {
           <p className="text-[10px] font-semibold uppercase tracking-[0.25em] text-emerald-200">
             Admin
           </p>
-          <h1 className="text-xl font-semibold text-white">
-            {event?.name || 'Event'} - Holes
-          </h1>
+          <h1 className="text-xl font-semibold text-white">{event?.name || 'Event'} - Holes</h1>
         </div>
         <Link
           href="/admin"
@@ -207,4 +210,3 @@ export default function HolesManagementPage() {
     </div>
   );
 }
-
